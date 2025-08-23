@@ -1,0 +1,7 @@
+﻿services:
+  gametk:
+    image: gametk
+    build:
+      context: .
+      dockerfile: Dockerfile
+

@@ -3,7 +3,7 @@ using OpenTK.Graphics.OpenGL;
 
 namespace GameTK.Shapes.Base
 {
-    public abstract class VectorShape : IDisposable
+    public abstract class Objeto : IDisposable
     {
         protected float[] vertices;
         protected uint[] indices;
@@ -19,7 +19,7 @@ namespace GameTK.Shapes.Base
         protected static int shaderProgram = -1;
         protected static bool shaderCreated = false;
 
-        public VectorShape(Vector3 position, Vector3 color, Vector3 scale)
+        public Objeto(Vector3 position, Vector3 color, Vector3 scale)
         {
             this.position = position;
             this.color = color;
@@ -34,7 +34,7 @@ namespace GameTK.Shapes.Base
         }
 
         // Constructor con escala por defecto
-        public VectorShape(Vector3 position, Vector3 color) 
+        public Objeto(Vector3 position, Vector3 color) 
             : this(position, color, Vector3.One) { }
 
         // Método abstracto que cada forma debe implementar

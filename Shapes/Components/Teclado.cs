@@ -3,12 +3,12 @@ using GameTK.Shapes.Base;
 
 namespace GameTK.Shapes.Components
 {
-    public class Keyboard : Objeto
+    public class Teclado : Objeto
     {
         private float width;
         private float height;
 
-        public Keyboard(Vector3 position, Vector3 color, float width = 0.8f, float height = 0.2f)
+        public Teclado(Vector3 position, Vector3 color, float width = 0.8f, float height = 0.2f)
             : base(position, color)
         {
             this.width = width;
