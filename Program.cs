@@ -7,6 +7,7 @@ class Program
         Console.WriteLine("Hello, World!");
         using(Game game = new Game())
         {
+            // version antigua:
             game.Run();
         }
     }
