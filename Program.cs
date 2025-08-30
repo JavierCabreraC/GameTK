@@ -1,14 +1,13 @@
-﻿namespace GameTK;
-
-class Program
+﻿namespace GameTK
 {
-    static void Main(string[] args)
+    class Program
     {
-        Console.WriteLine("Hello, World!");
-        using(Game game = new Game())
+        static void Main(string[] args)
         {
-            // version antigua:
-            game.Run();
+            using (var game = new Game(800, 640))
+            {
+                game.Run(60.0);
+            }
         }
     }
 }
