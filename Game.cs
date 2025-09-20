@@ -1,306 +1,336 @@
-using System;
-using OpenTK;
-using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
+using OpenTK.Mathematics;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Windowing.GraphicsLibraryFramework;
+using System.Text.Json;
 
-namespace GameTK
+public class Game : GameWindow
 {
-    public class Game : GameWindow
+    // === CONFIGURACIÓN Y ESCENARIO ===
+    private Escenario _escenario;
+    private ConfiguracionEscena _configuracion;
+    
+    // === CÁMARA ===
+    private float _rotationX;
+    private float _rotationY;
+    private float _cameraDistance;
+    private float _campoVision;
+    private float _nearPlane;
+    private float _farPlane;
+    private Color4 _colorFondo;
+    
+    // === SELECCIÓN DE OBJETOS ===
+    private List<string> _nombresObjetos;
+    private int _indiceSeleccion = 0;
+    private string _objetoSeleccionado;
+    
+    // === MODO PARTES ===
+    private bool _modoPartes = false;
+    private int _parteSeleccionada = 0;
+    
+    // === CONTROLES DE TRANSFORMACIÓN ===
+    private float _incrementoMovimiento = 0.05f;
+    private float _incrementoRotacion = 2.0f;
+    private float _incrementoEscala = 0.02f;
+
+    public Game(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings)
+        : base(gameWindowSettings, nativeWindowSettings)
     {
+        _escenario = new Escenario();
+        _nombresObjetos = new List<string>();
+        
+        CargarConfiguracion("configuracion.json");
+        CrearSetupDesdeConfiguracion();
+    }
 
-        private Escenario escenario;
-
-        public Game(int width, int height) : base(width, height, GraphicsMode.Default, "Diseño Computadora - 3D")
+    private void CargarConfiguracion(string rutaArchivo)
+    {
+        try
         {
-            var monitorScreenFront = new Poligono(new Color4(0.1f, 0.1f, 0.1f, 1.0f)); // Dark gray for screen
-            monitorScreenFront.addVertice(-0.8f, 0.4f, 0.1f);
-            monitorScreenFront.addVertice(0.8f, 0.4f, 0.1f);
-            monitorScreenFront.addVertice(0.8f, -0.2f, 0.1f);
-            monitorScreenFront.addVertice(-0.8f, -0.2f, 0.1f);
-            monitorScreenFront.setCentro(new Punto(0.0f, 0.4f, 0.0f)); // Raised up
+            if (!File.Exists(rutaArchivo))
+                throw new FileNotFoundException($"Archivo no encontrado: {rutaArchivo}");
 
-            var monitorScreenBack = new Poligono(new Color4(0.2f, 0.2f, 0.2f, 1.0f));
-            monitorScreenBack.addVertice(-0.8f, 0.4f, -0.1f);
-            monitorScreenBack.addVertice(0.8f, 0.4f, -0.1f);
-            monitorScreenBack.addVertice(0.8f, -0.2f, -0.1f);
-            monitorScreenBack.addVertice(-0.8f, -0.2f, -0.1f);
-            monitorScreenBack.setCentro(new Punto(0.0f, 0.4f, 0.0f));
+            string json = File.ReadAllText(rutaArchivo);
+            _configuracion = JsonSerializer.Deserialize<ConfiguracionEscena>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            var monitorScreenLeft = new Poligono(new Color4(0.3f, 0.3f, 0.3f, 1.0f));
-            monitorScreenLeft.addVertice(-0.8f, 0.4f, 0.1f);
-            monitorScreenLeft.addVertice(-0.8f, 0.4f, -0.1f);
-            monitorScreenLeft.addVertice(-0.8f, -0.2f, -0.1f);
-            monitorScreenLeft.addVertice(-0.8f, -0.2f, 0.1f);
-            monitorScreenLeft.setCentro(new Punto(0.0f, 0.4f, 0.0f));
-
-            var monitorScreenRight = new Poligono(new Color4(0.3f, 0.3f, 0.3f, 1.0f));
-            monitorScreenRight.addVertice(0.8f, 0.4f, 0.1f);
-            monitorScreenRight.addVertice(0.8f, 0.4f, -0.1f);
-            monitorScreenRight.addVertice(0.8f, -0.2f, -0.1f);
-            monitorScreenRight.addVertice(0.8f, -0.2f, 0.1f);
-            monitorScreenRight.setCentro(new Punto(0.0f, 0.4f, 0.0f));
-
-            var monitorScreenTop = new Poligono(new Color4(0.3f, 0.3f, 0.3f, 1.0f));
-            monitorScreenTop.addVertice(-0.8f, 0.4f, 0.1f);
-            monitorScreenTop.addVertice(-0.8f, 0.4f, -0.1f);
-            monitorScreenTop.addVertice(0.8f, 0.4f, -0.1f);
-            monitorScreenTop.addVertice(0.8f, 0.4f, 0.1f);
-            monitorScreenTop.setCentro(new Punto(0.0f, 0.4f, 0.0f));
-
-            var monitorScreenBottom = new Poligono(new Color4(0.3f, 0.3f, 0.3f, 1.0f));
-            monitorScreenBottom.addVertice(-0.8f, -0.2f, 0.1f);
-            monitorScreenBottom.addVertice(-0.8f, -0.2f, -0.1f);
-            monitorScreenBottom.addVertice(0.8f, -0.2f, -0.1f);
-            monitorScreenBottom.addVertice(0.8f, -0.2f, 0.1f);
-            monitorScreenBottom.setCentro(new Punto(0.0f, 0.4f, 0.0f));
-
-            var monitorScreenPart = new Partes();
-            monitorScreenPart.add("Monitor Screen Front", monitorScreenFront);
-            monitorScreenPart.add("Monitor Screen Back", monitorScreenBack);
-            monitorScreenPart.add("Monitor Screen Left", monitorScreenLeft);
-            monitorScreenPart.add("Monitor Screen Right", monitorScreenRight);
-            monitorScreenPart.add("Monitor Screen Top", monitorScreenTop);
-            monitorScreenPart.add("Monitor Screen Bottom", monitorScreenBottom);
-            monitorScreenPart.setCentro(new Punto(0.0f, 0.4f, 0.0f));
-
-            // Monitor Stand (narrow, short prism below screen)
-            var monitorStandFront = new Poligono(new Color4(0.4f, 0.4f, 0.4f, 1.0f));
-            monitorStandFront.addVertice(-0.2f, -0.2f, 0.15f);
-            monitorStandFront.addVertice(0.2f, -0.2f, 0.15f);
-            monitorStandFront.addVertice(0.2f, -0.5f, 0.15f);
-            monitorStandFront.addVertice(-0.2f, -0.5f, 0.15f);
-            monitorStandFront.setCentro(new Punto(0.0f, -0.15f, 0.0f)); // Positioned below screen
-
-            var monitorStandBack = new Poligono(new Color4(0.4f, 0.4f, 0.4f, 1.0f));
-            monitorStandBack.addVertice(-0.2f, -0.2f, -0.15f);
-            monitorStandBack.addVertice(0.2f, -0.2f, -0.15f);
-            monitorStandBack.addVertice(0.2f, -0.5f, -0.15f);
-            monitorStandBack.addVertice(-0.2f, -0.5f, -0.15f);
-            monitorStandBack.setCentro(new Punto(0.0f, -0.15f, 0.0f));
-
-            var monitorStandLeft = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            monitorStandLeft.addVertice(-0.2f, -0.2f, 0.15f);
-            monitorStandLeft.addVertice(-0.2f, -0.2f, -0.15f);
-            monitorStandLeft.addVertice(-0.2f, -0.5f, -0.15f);
-            monitorStandLeft.addVertice(-0.2f, -0.5f, 0.15f);
-            monitorStandLeft.setCentro(new Punto(0.0f, -0.15f, 0.0f));
-
-            var monitorStandRight = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            monitorStandRight.addVertice(0.2f, -0.2f, 0.15f);
-            monitorStandRight.addVertice(0.2f, -0.2f, -0.15f);
-            monitorStandRight.addVertice(0.2f, -0.5f, -0.15f);
-            monitorStandRight.addVertice(0.2f, -0.5f, 0.15f);
-            monitorStandRight.setCentro(new Punto(0.0f, -0.15f, 0.0f));
-
-            var monitorStandTop = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            monitorStandTop.addVertice(-0.2f, -0.2f, 0.15f);
-            monitorStandTop.addVertice(-0.2f, -0.2f, -0.15f);
-            monitorStandTop.addVertice(0.2f, -0.2f, -0.15f);
-            monitorStandTop.addVertice(0.2f, -0.2f, 0.15f);
-            monitorStandTop.setCentro(new Punto(0.0f, -0.15f, 0.0f));
-
-            var monitorStandBottom = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            monitorStandBottom.addVertice(-0.2f, -0.5f, 0.15f);
-            monitorStandBottom.addVertice(-0.2f, -0.5f, -0.15f);
-            monitorStandBottom.addVertice(0.2f, -0.5f, -0.15f);
-            monitorStandBottom.addVertice(0.2f, -0.5f, 0.15f);
-            monitorStandBottom.setCentro(new Punto(0.0f, -0.15f, 0.0f));
-
-            var monitorStandPart = new Partes();
-            monitorStandPart.add("Monitor Stand Front", monitorStandFront);
-            monitorStandPart.add("Monitor Stand Back", monitorStandBack);
-            monitorStandPart.add("Monitor Stand Left", monitorStandLeft);
-            monitorStandPart.add("Monitor Stand Right", monitorStandRight);
-            monitorStandPart.add("Monitor Stand Top", monitorStandTop);
-            monitorStandPart.add("Monitor Stand Bottom", monitorStandBottom);
-            monitorStandPart.setCentro(new Punto(0.0f, -0.15f, 0.0f));
-
-            // Monitor as a single Objeto with two parts
-            var monitor = new Objeto();
-            monitor.addParte("Monitor Screen", monitorScreenPart);
-            monitor.addParte("Monitor Stand", monitorStandPart);
-            monitor.setCentro(new Punto(0.0f, 0.0f, 0.0f)); // Centered in scene
-
-            // Keyboard (wide, flat, shallow prism, positioned in front)
-            var keyboardFront = new Poligono(new Color4(0.2f, 0.2f, 0.2f, 1.0f));
-            keyboardFront.addVertice(-0.7f, -0.45f, 0.6f); // Moved forward on Z
-            keyboardFront.addVertice(0.7f, -0.45f, 0.6f);
-            keyboardFront.addVertice(0.7f, -0.55f, 0.6f);
-            keyboardFront.addVertice(-0.7f, -0.55f, 0.6f);
-            keyboardFront.setCentro(new Punto(0.0f, -0.5f, 0.5f));
-
-            var keyboardBack = new Poligono(new Color4(0.2f, 0.2f, 0.2f, 1.0f));
-            keyboardBack.addVertice(-0.7f, -0.45f, 0.3f);
-            keyboardBack.addVertice(0.7f, -0.45f, 0.3f);
-            keyboardBack.addVertice(0.7f, -0.55f, 0.3f);
-            keyboardBack.addVertice(-0.7f, -0.55f, 0.3f);
-            keyboardBack.setCentro(new Punto(0.0f, -0.5f, 0.5f));
-
-            var keyboardLeft = new Poligono(new Color4(0.3f, 0.3f, 0.3f, 1.0f));
-            keyboardLeft.addVertice(-0.7f, -0.45f, 0.6f);
-            keyboardLeft.addVertice(-0.7f, -0.45f, 0.3f);
-            keyboardLeft.addVertice(-0.7f, -0.55f, 0.3f);
-            keyboardLeft.addVertice(-0.7f, -0.55f, 0.6f);
-            keyboardLeft.setCentro(new Punto(0.0f, -0.5f, 0.5f));
-
-            var keyboardRight = new Poligono(new Color4(0.3f, 0.3f, 0.3f, 1.0f));
-            keyboardRight.addVertice(0.7f, -0.45f, 0.6f);
-            keyboardRight.addVertice(0.7f, -0.45f, 0.3f);
-            keyboardRight.addVertice(0.7f, -0.55f, 0.3f);
-            keyboardRight.addVertice(0.7f, -0.55f, 0.6f);
-            keyboardRight.setCentro(new Punto(0.0f, -0.5f, 0.5f));
-
-            var keyboardTop = new Poligono(new Color4(0.1f, 0.1f, 0.1f, 1.0f)); // Dark top for keys
-            keyboardTop.addVertice(-0.7f, -0.45f, 0.6f);
-            keyboardTop.addVertice(-0.7f, -0.45f, 0.3f);
-            keyboardTop.addVertice(0.7f, -0.45f, 0.3f);
-            keyboardTop.addVertice(0.7f, -0.45f, 0.6f);
-            keyboardTop.setCentro(new Punto(0.0f, -0.5f, 0.5f));
-
-            var keyboardBottom = new Poligono(new Color4(0.3f, 0.3f, 0.3f, 1.0f));
-            keyboardBottom.addVertice(-0.7f, -0.55f, 0.6f);
-            keyboardBottom.addVertice(-0.7f, -0.55f, 0.3f);
-            keyboardBottom.addVertice(0.7f, -0.55f, 0.3f);
-            keyboardBottom.addVertice(0.7f, -0.55f, 0.6f);
-            keyboardBottom.setCentro(new Punto(0.0f, -0.5f, 0.5f));
-
-            var keyboardPart = new Partes();
-            keyboardPart.add("Keyboard Front", keyboardFront);
-            keyboardPart.add("Keyboard Back", keyboardBack);
-            keyboardPart.add("Keyboard Left", keyboardLeft);
-            keyboardPart.add("Keyboard Right", keyboardRight);
-            keyboardPart.add("Keyboard Top", keyboardTop);
-            keyboardPart.add("Keyboard Bottom", keyboardBottom);
-            keyboardPart.setCentro(new Punto(0.0f, -0.5f, 0.5f));
-
-            var keyboard = new Objeto();
-            keyboard.addParte("Keyboard", keyboardPart);
-            keyboard.setCentro(new Punto(0.0f, -0.5f, 0.5f)); // In front of monitor
-
-            // CPU (tall tower prism, positioned to the side)
-            var cpuFront = new Poligono(new Color4(0.4f, 0.4f, 0.4f, 1.0f));
-            cpuFront.addVertice(1.0f, 0.5f, 0.3f); // Shifted right on X
-            cpuFront.addVertice(1.5f, 0.5f, 0.3f);
-            cpuFront.addVertice(1.5f, -0.6f, 0.3f);
-            cpuFront.addVertice(1.0f, -0.6f, 0.3f);
-            cpuFront.setCentro(new Punto(1.25f, 0.0f, 0.0f));
-
-            var cpuBack = new Poligono(new Color4(0.4f, 0.4f, 0.4f, 1.0f));
-            cpuBack.addVertice(1.0f, 0.5f, -0.3f);
-            cpuBack.addVertice(1.5f, 0.5f, -0.3f);
-            cpuBack.addVertice(1.5f, -0.6f, -0.3f);
-            cpuBack.addVertice(1.0f, -0.6f, -0.3f);
-            cpuBack.setCentro(new Punto(1.25f, 0.0f, 0.0f));
-
-            var cpuLeft = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            cpuLeft.addVertice(1.0f, 0.5f, 0.3f);
-            cpuLeft.addVertice(1.0f, 0.5f, -0.3f);
-            cpuLeft.addVertice(1.0f, -0.6f, -0.3f);
-            cpuLeft.addVertice(1.0f, -0.6f, 0.3f);
-            cpuLeft.setCentro(new Punto(1.25f, 0.0f, 0.0f));
-
-            var cpuRight = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            cpuRight.addVertice(1.5f, 0.5f, 0.3f);
-            cpuRight.addVertice(1.5f, 0.5f, -0.3f);
-            cpuRight.addVertice(1.5f, -0.6f, -0.3f);
-            cpuRight.addVertice(1.5f, -0.6f, 0.3f);
-            cpuRight.setCentro(new Punto(1.25f, 0.0f, 0.0f));
-
-            var cpuTop = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            cpuTop.addVertice(1.0f, 0.5f, 0.3f);
-            cpuTop.addVertice(1.0f, 0.5f, -0.3f);
-            cpuTop.addVertice(1.5f, 0.5f, -0.3f);
-            cpuTop.addVertice(1.5f, 0.5f, 0.3f);
-            cpuTop.setCentro(new Punto(1.25f, 0.0f, 0.0f));
-
-            var cpuBottom = new Poligono(new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-            cpuBottom.addVertice(1.0f, -0.6f, 0.3f);
-            cpuBottom.addVertice(1.0f, -0.6f, -0.3f);
-            cpuBottom.addVertice(1.5f, -0.6f, -0.3f);
-            cpuBottom.addVertice(1.5f, -0.6f, 0.3f);
-            cpuBottom.setCentro(new Punto(1.25f, 0.0f, 0.0f));
-
-            var cpuPart = new Partes();
-            cpuPart.add("CPU Front", cpuFront);
-            cpuPart.add("CPU Back", cpuBack);
-            cpuPart.add("CPU Left", cpuLeft);
-            cpuPart.add("CPU Right", cpuRight);
-            cpuPart.add("CPU Top", cpuTop); 
-            cpuPart.add("CPU Bottom", cpuBottom);
-            cpuPart.setCentro(new Punto(1.25f, 0.0f, 0.0f));
-
-            var cpu = new Objeto();
-            cpu.addParte("CPU Tower", cpuPart);
-            cpu.setCentro(new Punto(1.25f, 0.0f, 0.0f)); // To the right
-
-            // Escenario:
-            this.escenario = new Escenario(new Vector3(0, 0, 0));
-            this.escenario.addObjeto("Monitor", monitor);
-            this.escenario.addObjeto("Keyboard", keyboard);
-            this.escenario.addObjeto("CPU", cpu);
+            if (_configuracion?.Camara == null || _configuracion?.Objetos == null)
+                throw new Exception("Configuración JSON inválida");
         }
-        protected override void OnLoad(EventArgs e)
+        catch (Exception ex)
         {
-            base.OnLoad(e);
-            GL.ClearColor(0.0f, 0.5f, 0.0f, 1.0f);
+            Console.WriteLine($"Error al cargar configuración: {ex.Message}");
+            throw;
         }
 
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
+        // Aplicar configuración de cámara
+        _rotationX = _configuracion.Camara.RotacionInicialX;
+        _rotationY = _configuracion.Camara.RotacionInicialY;
+        _cameraDistance = _configuracion.Camara.DistanciaInicial;
+        _campoVision = _configuracion.Camara.CampoVision;
+        _nearPlane = _configuracion.Camara.NearPlane;
+        _farPlane = _configuracion.Camara.FarPlane;
+        _colorFondo = _configuracion.ColorFondo?.ToColor4() ?? new Color4(0.65f, 0.5f, 0.35f, 1.0f);
+    }
 
-            GL.Viewport(0, 0, Width, Height);
-            float aspectRatio = (float)Width / Height;
-            Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(
-                MathHelper.DegreesToRadians(45.0f), aspectRatio, 0.1f, 100.0f);
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadMatrix(ref projection);
-            GL.MatrixMode(MatrixMode.Modelview);
-            GL.LoadIdentity();
+    private void CrearSetupDesdeConfiguracion()
+    {
+        foreach (var configObjeto in _configuracion.Objetos)
+        {
+            if (string.IsNullOrEmpty(configObjeto.Nombre))
+                continue;
+
+            var objeto = new Objeto(configObjeto.Nombre);
+
+            // Establecer centro de masa
+            if (configObjeto.CentroMasa != null)
+                objeto.CentroMasa = configObjeto.CentroMasa.ToVector3();
+
+            // Crear partes del objeto
+            if (configObjeto.Partes != null && configObjeto.Partes.Count > 0)
+            {
+                foreach (var configParte in configObjeto.Partes)
+                {
+                    if (configParte.Dimensiones == null) continue;
+
+                    var posicionRelativa = configParte.PosicionRelativa?.ToVector3() ?? Vector3.Zero;
+                    var parte = objeto.CrearParte(configParte.Nombre ?? "sin_nombre", posicionRelativa);
+                    var vertices = CrearVerticesCubo(configParte.Dimensiones.ToVector3());
+                    var colorParte = configParte.Color?.ToColor4() ?? new Color4(0.5f, 0.5f, 0.5f, 1.0f);
+
+                    foreach (var caraVertices in vertices)
+                        parte.AgregarCara(caraVertices, colorParte);
+                }
+            }
+            else if (configObjeto.Dimensiones != null)
+            {
+                // Objeto simple sin partes
+                var parte = objeto.CrearParte("principal", Vector3.Zero);
+                var vertices = CrearVerticesCubo(configObjeto.Dimensiones.ToVector3());
+                var colorObjeto = configObjeto.Color?.ToColor4() ?? new Color4(0.5f, 0.5f, 0.5f, 1.0f);
+
+                foreach (var caraVertices in vertices)
+                    parte.AgregarCara(caraVertices, colorObjeto);
+            }
+
+            // Calcular centro de masa si no se especificó
+            if (configObjeto.CentroMasa == null)
+                objeto.CalcularCentroMasa();
+
+            // Establecer posición del objeto
+            if (configObjeto.Posicion != null)
+                objeto.Mover(configObjeto.Posicion.ToVector3());
+
+            // CORRECCIÓN: Agregar solo UNA vez al escenario
+            _escenario.AgregarObjeto(configObjeto.Nombre, objeto);
+            _nombresObjetos.Add(configObjeto.Nombre);
         }
 
+        // Seleccionar primer objeto
+        if (_nombresObjetos.Count > 0)
+            _objetoSeleccionado = _nombresObjetos[0];
+    }
 
-
-        protected override void OnUpdateFrame(FrameEventArgs e)
+    private List<List<Vertice>> CrearVerticesCubo(Vector3 dim)
+    {
+        float x = dim.X, y = dim.Y, z = dim.Z;
+        return new List<List<Vertice>>
         {
-            base.OnUpdateFrame(e);
+            new List<Vertice> { new(-x,-y, z), new( x,-y, z), new( x, y, z), new(-x, y, z) }, // Frente
+            new List<Vertice> { new(-x,-y,-z), new(-x, y,-z), new( x, y,-z), new( x,-y,-z) }, // Atrás
+            new List<Vertice> { new(-x, y,-z), new(-x, y, z), new( x, y, z), new( x, y,-z) }, // Arriba
+            new List<Vertice> { new(-x,-y,-z), new( x,-y,-z), new( x,-y, z), new(-x,-y, z) }, // Abajo
+            new List<Vertice> { new( x,-y,-z), new( x, y,-z), new( x, y, z), new( x,-y, z) }, // Derecha
+            new List<Vertice> { new(-x,-y,-z), new(-x,-y, z), new(-x, y, z), new(-x, y,-z) }  // Izquierda
+        };
+    }
+
+    protected override void OnLoad()
+    {
+        base.OnLoad();
+        GL.ClearColor(_colorFondo);
+        GL.Enable(EnableCap.DepthTest);
+        GL.Enable(EnableCap.CullFace);
+        GL.CullFace(CullFaceMode.Back);
+    }
+
+    protected override void OnResize(ResizeEventArgs e)
+    {
+        base.OnResize(e);
+        GL.Viewport(0, 0, Size.X, Size.Y);
+
+        var projection = Matrix4.CreatePerspectiveFieldOfView(
+            MathHelper.DegreesToRadians(_campoVision),
+            (float)Size.X / Size.Y,
+            _nearPlane,
+            _farPlane);
+
+        GL.MatrixMode(MatrixMode.Projection);
+        GL.LoadMatrix(ref projection);
+    }
+
+    protected override void OnUpdateFrame(FrameEventArgs args)
+    {
+        base.OnUpdateFrame(args);
+        var input = KeyboardState;
+
+        if (input.IsKeyDown(Keys.Escape)) Close();
+
+        // === CÁMARA ===
+        if (input.IsKeyDown(Keys.W)) _rotationX += 1f;
+        if (input.IsKeyDown(Keys.S)) _rotationX -= 1f;
+        if (input.IsKeyDown(Keys.A)) _rotationY += 1f;
+        if (input.IsKeyDown(Keys.D)) _rotationY -= 1f;
+        if (input.IsKeyDown(Keys.Q)) _cameraDistance -= 0.1f;
+        if (input.IsKeyDown(Keys.E)) _cameraDistance += 0.1f;
+
+        // === SELECCIÓN ===
+        if (input.IsKeyPressed(Keys.Tab)) CambiarObjetoSeleccionado();
+        if (input.IsKeyPressed(Keys.Space)) ResetearObjeto();
+
+        var objeto = _escenario.ObtenerObjeto(_objetoSeleccionado);
+        if (objeto == null) return;
+
+        // === TRANSFORMACIONES DE OBJETO ===
+        if (!_modoPartes)
+        {
+            // Movimiento
+            if (input.IsKeyDown(Keys.Up)) objeto.Trasladar(new Vector3(0, _incrementoMovimiento, 0));
+            if (input.IsKeyDown(Keys.Down)) objeto.Trasladar(new Vector3(0, -_incrementoMovimiento, 0));
+            if (input.IsKeyDown(Keys.Left)) objeto.Trasladar(new Vector3(-_incrementoMovimiento, 0, 0));
+            if (input.IsKeyDown(Keys.Right)) objeto.Trasladar(new Vector3(_incrementoMovimiento, 0, 0));
+            if (input.IsKeyDown(Keys.PageUp)) objeto.Trasladar(new Vector3(0, 0, _incrementoMovimiento));
+            if (input.IsKeyDown(Keys.PageDown)) objeto.Trasladar(new Vector3(0, 0, -_incrementoMovimiento));
+
+            // Rotación (Shift)
+            if (input.IsKeyDown(Keys.LeftShift) || input.IsKeyDown(Keys.RightShift))
+            {
+                if (input.IsKeyDown(Keys.Up)) objeto.Rotar(new Vector3(_incrementoRotacion, 0, 0));
+                if (input.IsKeyDown(Keys.Down)) objeto.Rotar(new Vector3(-_incrementoRotacion, 0, 0));
+                if (input.IsKeyDown(Keys.Left)) objeto.Rotar(new Vector3(0, _incrementoRotacion, 0));
+                if (input.IsKeyDown(Keys.Right)) objeto.Rotar(new Vector3(0, -_incrementoRotacion, 0));
+            }
+
+            // Escalado (Ctrl)
+            if (input.IsKeyDown(Keys.LeftControl) || input.IsKeyDown(Keys.RightControl))
+            {
+                if (input.IsKeyDown(Keys.Up)) objeto.Escalar(new Vector3(1 + _incrementoEscala, 1 + _incrementoEscala, 1 + _incrementoEscala));
+                if (input.IsKeyDown(Keys.Down)) objeto.Escalar(new Vector3(1 - _incrementoEscala, 1 - _incrementoEscala, 1 - _incrementoEscala));
+            }
+
+            // Reflexión (Alt)
+            if (input.IsKeyDown(Keys.LeftAlt) || input.IsKeyDown(Keys.RightAlt))
+            {
+                if (input.IsKeyPressed(Keys.Up)) objeto.Reflejar(false, true, false);
+                if (input.IsKeyPressed(Keys.Left)) objeto.Reflejar(true, false, false);
+                if (input.IsKeyPressed(Keys.PageUp)) objeto.Reflejar(false, false, true);
+            }
         }
 
-
-        protected override void OnRenderFrame(FrameEventArgs e)
+        // === MODO PARTES ===
+        if (input.IsKeyPressed(Keys.P))
         {
-            base.OnRenderFrame(e);
-
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            GL.Enable(EnableCap.DepthTest);
-            // Configura la cámara
-            Matrix4 modelview = Matrix4.LookAt(
-                new Vector3(0.0f, 2f, 3.5f), // Posición de la cámara
-                new Vector3(0.0f, 0.1f, 0.0f), // Punto de mira
-                Vector3.UnitY); // Vector arriba
-            GL.LoadMatrix(ref modelview);
-            
-            escenario.dibujar(new Vector3(0, 0, 0));
-            GL.End();
-            SwapBuffers();
+            _modoPartes = !_modoPartes;
+            _parteSeleccionada = 0;
         }
-        private void DibujarEjes()
+
+        if (_modoPartes && objeto.Partes.Count > 0)
         {
-            GL.Begin(PrimitiveType.Lines);
+            if (input.IsKeyPressed(Keys.N))
+                _parteSeleccionada = (_parteSeleccionada + 1) % objeto.Partes.Count;
 
-            GL.Color3(1.0f, 0.0f, 0.0f); // X
-            GL.Vertex3(-2.0f, 0.0f, 0.0f);
-            GL.Vertex3(2.0f, 0.0f, 0.0f);
+            var parte = objeto.Partes[_parteSeleccionada];
 
-            GL.Color3(0.0f, 1.0f, 0.0f); // Y
-            GL.Vertex3(0.0f, -2.0f, 0.0f);
-            GL.Vertex3(0.0f, 2.0f, 0.0f);
-
-            GL.Color3(0.0f, 0.0f, 1.0f); // Z
-            GL.Vertex3(0.0f, 0.0f, -2.0f);
-            GL.Vertex3(0.0f, 0.0f, 2.0f);
-
-            GL.End();
+            if (input.IsKeyDown(Keys.D1)) // Mover
+            {
+                if (input.IsKeyDown(Keys.Up)) parte.Trasladar(new Vector3(0, _incrementoMovimiento, 0));
+                if (input.IsKeyDown(Keys.Down)) parte.Trasladar(new Vector3(0, -_incrementoMovimiento, 0));
+                if (input.IsKeyDown(Keys.Left)) parte.Trasladar(new Vector3(-_incrementoMovimiento, 0, 0));
+                if (input.IsKeyDown(Keys.Right)) parte.Trasladar(new Vector3(_incrementoMovimiento, 0, 0));
+            }
+            if (input.IsKeyDown(Keys.D2)) // Rotar
+            {
+                if (input.IsKeyDown(Keys.Up)) parte.Rotar(new Vector3(_incrementoRotacion, 0, 0));
+                if (input.IsKeyDown(Keys.Down)) parte.Rotar(new Vector3(-_incrementoRotacion, 0, 0));
+                if (input.IsKeyDown(Keys.Left)) parte.Rotar(new Vector3(0, _incrementoRotacion, 0));
+                if (input.IsKeyDown(Keys.Right)) parte.Rotar(new Vector3(0, -_incrementoRotacion, 0));
+            }
+            if (input.IsKeyDown(Keys.D3)) // Escalar
+            {
+                if (input.IsKeyDown(Keys.Up)) parte.Escalar(new Vector3(1 + _incrementoEscala, 1 + _incrementoEscala, 1 + _incrementoEscala));
+                if (input.IsKeyDown(Keys.Down)) parte.Escalar(new Vector3(1 - _incrementoEscala, 1 - _incrementoEscala, 1 - _incrementoEscala));
+            }
         }
+
+        // === ESCENARIO ===
+        if (input.IsKeyDown(Keys.R)) _escenario.Rotar(new Vector3(0, _incrementoRotacion, 0));
+        if (input.IsKeyDown(Keys.T)) _escenario.Escalar(new Vector3(1 + _incrementoEscala, 1 + _incrementoEscala, 1 + _incrementoEscala));
+        if (input.IsKeyDown(Keys.Y)) _escenario.Escalar(new Vector3(1 - _incrementoEscala, 1 - _incrementoEscala, 1 - _incrementoEscala));
+
+        // === AJUSTES ===
+        if (input.IsKeyPressed(Keys.F1)) _incrementoMovimiento = Math.Max(0.01f, _incrementoMovimiento - 0.01f);
+        if (input.IsKeyPressed(Keys.F2)) _incrementoMovimiento = Math.Min(0.5f, _incrementoMovimiento + 0.01f);
+        if (input.IsKeyPressed(Keys.F3)) _incrementoRotacion = Math.Max(0.5f, _incrementoRotacion - 0.5f);
+        if (input.IsKeyPressed(Keys.F4)) _incrementoRotacion = Math.Min(10f, _incrementoRotacion + 0.5f);
+        if (input.IsKeyPressed(Keys.F5)) _incrementoEscala = Math.Max(0.005f, _incrementoEscala - 0.005f);
+        if (input.IsKeyPressed(Keys.F6)) _incrementoEscala = Math.Min(0.1f, _incrementoEscala + 0.005f);
+
+        if (input.IsKeyPressed(Keys.F12)) MostrarAyuda();
+    }
+
+    protected override void OnRenderFrame(FrameEventArgs args)
+    {
+        base.OnRenderFrame(args);
+        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+        var view = Matrix4.LookAt(
+            new Vector3(0.0f, 0.5f, _cameraDistance),
+            Vector3.Zero,
+            Vector3.UnitY);
+
+        GL.MatrixMode(MatrixMode.Modelview);
+        GL.LoadMatrix(ref view);
+        GL.Rotate(_rotationX, Vector3.UnitX);
+        GL.Rotate(_rotationY, Vector3.UnitY);
+
+        _escenario.Dibujar();
+
+        string modoInfo = _modoPartes && _escenario.ObtenerObjeto(_objetoSeleccionado)?.Partes.Count > 0
+            ? $" - MODO PARTES: {_escenario.ObtenerObjeto(_objetoSeleccionado).Partes[_parteSeleccionada].Nombre}"
+            : "";
+        Title = $"Setup de Computadora - {_objetoSeleccionado}{modoInfo}";
+
+        SwapBuffers();
+    }
+
+    private void CambiarObjetoSeleccionado()
+    {
+        if (_nombresObjetos.Count == 0) return;
+        _indiceSeleccion = (_indiceSeleccion + 1) % _nombresObjetos.Count;
+        _objetoSeleccionado = _nombresObjetos[_indiceSeleccion];
+    }
+
+    private void ResetearObjeto()
+    {
+        var objeto = _escenario.ObtenerObjeto(_objetoSeleccionado);
+        if (objeto != null)
+        {
+            objeto.Posicion = Vector3.Zero;
+            objeto.Rotacion = Vector3.Zero;
+            objeto.Escala = Vector3.One;
+            objeto.Reflexion = Vector3.One;
+        }
+    }
+
+    private void MostrarAyuda()
+    {
+        Console.WriteLine("\n=== CONTROLES ===");
+        Console.WriteLine("CÁMARA: WASD (rotar), Q/E (zoom)");
+        Console.WriteLine("SELECCIÓN: TAB (objeto), P (modo partes), N (siguiente parte), ESPACIO (resetear)");
+        Console.WriteLine("OBJETO: Flechas (mover), Shift+Flechas (rotar), Ctrl+Flechas (escalar), Alt+Flechas (reflejar)");
+        Console.WriteLine("PARTES: 1-4 + Flechas (mover/rotar/escalar/reflejar parte)");
+        Console.WriteLine("ESCENARIO: R (rotar), T/Y (escalar)");
+        Console.WriteLine("AJUSTES: F1-F6 (velocidades)\n");
     }
 }
